@@ -1,0 +1,10 @@
+"Coolgauge1" 0000 0000 00 00
+"Gauge1" BC00 0013 56 00
+"Leddigits1" AC00 0018 70 01
+"iLeddigits1" BA00 0018 70 01
+"Spectrum1" FC00 0018 70 28
+"iSpectrum1" 0A00 0019 70 2D
+"Customdigits1" C200 0019 48 20
+"iCustomdigits1" C600 0019 48 20
+"Leddigits2" D000 0019 05 05
+"iLeddigits2" 2400 001A 05 05
