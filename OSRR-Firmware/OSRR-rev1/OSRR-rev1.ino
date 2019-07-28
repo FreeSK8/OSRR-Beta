@@ -21,11 +21,7 @@ float wheelPulley = 60;     //Wheel Pulley Tooth Count
 float motorPulley = 15;     //Motor Pulley Tooth Count
 float motorPoles = 14;      //Motor Poles - 14 default
 
-float gearRatio;                      
-float ratioRpmSpeed;
-float ratioPulseDistance;
-float distanceValue;
-                              
+       
 #include <Wire.h>
 #include "ESP8266WiFi.h"
 #include "GFX4dIoD9.h"
@@ -37,6 +33,12 @@ float distanceValue;
 #ifdef ESC_UNITY
 #include <VescUartUnity.h>
 #endif
+
+float gearRatio;                      
+float ratioRpmSpeed;
+float ratioPulseDistance;
+float distanceValue;
+                       
 
 #ifdef ESC_UNITY
 // Defining struct to handle callback data for UNITY
@@ -95,6 +97,7 @@ bool recievedData = false;
 uint32_t lastTimeReceived = 0;
 int timeoutMax = 500;
 unsigned long lastDataCheck;
+bool remoteBatteryWarning = true;
 bool connBlink = true;
 int connPulse = 1;
 int connBlinkCount = 0;
@@ -118,7 +121,8 @@ Adafruit_ADS1015 ads;     /* Use thi for the 12-bit version */
 unsigned long previousMillis = 0;
 const long interval = 250;
 
-int16_t thumbwheelVal;
+int16_t thumbwheelVal0;
+int16_t thumbwheelVal1;
 String command;
 int throttle = 127;
 int throttleCenterMargin = 5;
@@ -127,6 +131,13 @@ int min_ads = 0;
 int max_ads = 1700;
 int adc_max_limit = 2000;
 
+
+int16_t remoteBatRaw;
+int min_ads_bat = 0;
+int max_ads_bat = 1400;
+int adc_max_bat_limit = 2000;
+
+int16_t remoteRSSIRaw;
 
 void calculateRatios()  {
   gearRatio = (motorPulley) / (wheelPulley);                              
@@ -183,13 +194,14 @@ void setup() {
 
 void loop() {
 
-  thumbwheelVal = ads.readADC_SingleEnded(0);
-  if (thumbwheelVal > adc_max_limit){
+  thumbwheelVal0 = ads.readADC_SingleEnded(0);
+  // thumbwheelVal1 = ads.readADC_SingleEnded(1);
+  if (thumbwheelVal0 > adc_max_limit){
     throttle = 127;
   }
   else
   {
-  throttle = map(thumbwheelVal, min_ads, max_ads, 0, 255);
+  throttle = map(thumbwheelVal0, min_ads, max_ads, 0, 255);
   throttle = constrain(throttle, 0, 255);
   }
   /** The lowerButton is used to set cruise control ON */
@@ -203,6 +215,7 @@ void loop() {
   UART.setNunchuckValues();
   delay(20); //approx 48hz
 
+  //remoteRSSIRaw = ads.readADC_SingleEnded(2);
 
 
   unsigned long currentMillis = millis();
@@ -237,10 +250,11 @@ int speedValue = (ratioRpmSpeed * UART.data.rpm);
     }
 
     
-    gfx.MoveTo(0, 80);
+    gfx.MoveTo(12, 80);
     gfx.TextColor(RED, BLACK); gfx.Font(2);  gfx.TextSize(1);
     gfx.print("V ");
-    gfx.println(String(UART.data.inpVoltage));
+    float inputVoltage = UART.data.inpVoltage;
+    gfx.print(String(inputVoltage, 1));
 
 //    gfx.TextColor(CYAN, BLACK);
 //    gfx.print("M ");
@@ -257,29 +271,30 @@ int speedValue = (ratioRpmSpeed * UART.data.rpm);
 //
 //
 //
+    gfx.MoveTo(12, 96);
     gfx.TextColor(ORANGE, BLACK);
     gfx.print("W ");
     int currentBatWatts = (UART.data.avgInputCurrent * 2) * (UART.data.inpVoltage);
     if (currentBatWatts >= 1000) {
-      gfx.println(String(currentBatWatts));
+      gfx.print(String(currentBatWatts));
       }
       else if (currentBatWatts < 0) {
-      gfx.println("-RGN");  
+      gfx.print("-RGN");  
       }
      else if (currentBatWatts >= 100) {
       gfx.print("0");
-      gfx.println(String(currentBatWatts));
+      gfx.print(String(currentBatWatts));
       }       
      else if (currentBatWatts >= 10) {
       gfx.print("00");
-      gfx.println(String(currentBatWatts));
+      gfx.print(String(currentBatWatts));
       } 
     else if (currentBatWatts <= 9) {
       gfx.print("000");
-      gfx.println(String(currentBatWatts));
+      gfx.print(String(currentBatWatts));
     }
 
-
+    gfx.MoveTo(12, 112);
     gfx.TextColor(CYAN, BLACK);
     gfx.print("T ");
     #ifdef IMPERIAL
@@ -288,7 +303,9 @@ int speedValue = (ratioRpmSpeed * UART.data.rpm);
     #ifdef METRIC
     distanceValue = (ratioPulseDistance * UART.data.tachometerAbs);
     #endif    
-    gfx.println(String(distanceValue));
+    gfx.print(String(distanceValue));
+
+    updateRemoteBattery();
 
 //    successCount++;
 //    gfx.TextColor(CYAN, BLACK); gfx.Font(2);  gfx.TextSize(1);
@@ -297,7 +314,7 @@ int speedValue = (ratioRpmSpeed * UART.data.rpm);
 //    gfx.println(String(failCount));
 
     if (connBlink) {
-      gfx.CircleFilled(65, 145, 8, GREEN);
+      gfx.CircleFilled(65, 145, 8, LIMEGREEN);
     } else  {
       gfx.Circle(65, 145, (8), BLACK);
       gfx.Circle(65, 145, (7), BLACK);
@@ -315,5 +332,60 @@ int speedValue = (ratioRpmSpeed * UART.data.rpm);
       connBlinkCount = 0;
     }
 
+  }
+}
+
+void updateRemoteBattery() {
+   int batteryLevel;
+   remoteBatRaw = ads.readADC_SingleEnded(3);
+   batteryLevel = map(remoteBatRaw, min_ads_bat, max_ads_bat, 0, 100);
+   batteryLevel = constrain(batteryLevel, 0, 100);
+   remoteBatteryDisplay(batteryLevel);
+   
+    gfx.MoveTo(12, 64);
+    gfx.TextColor(RED, BLACK); gfx.Font(2);  gfx.TextSize(1);
+    gfx.print("R ");
+    gfx.print(String(remoteBatRaw));
+
+}
+
+
+void remoteBatteryDisplay(int remoteBatVal) {
+  gfx.RoundRect(2,135,52,155, 3, LIME);
+  if (remoteBatVal > 75)  {
+  gfx.RoundRectFilled(4, 137, 14, 153, 3, ORANGE);
+  gfx.RoundRectFilled(16, 137, 26, 153, 3, YELLOW);
+  gfx.RoundRectFilled(28, 137, 38, 153, 3, LIMEGREEN);
+  gfx.RoundRectFilled(40, 137, 50, 153, 3, LIMEGREEN);
+  }
+  else if (remoteBatVal > 50 && remoteBatVal <= 75) {
+  gfx.RoundRectFilled(4, 137, 14, 153, 3, ORANGE);
+  gfx.RoundRectFilled(16, 137, 26, 153, 3, YELLOW);
+  gfx.RoundRectFilled(28, 137, 38, 153, 3, LIMEGREEN);
+  gfx.RoundRectFilled(40, 137, 50, 153, 3, BLACK);
+  }
+  else if (remoteBatVal > 25 && remoteBatVal <= 50) {
+  gfx.RoundRectFilled(4, 137, 14, 153, 3, ORANGE);
+  gfx.RoundRectFilled(16, 137, 26, 153, 3, YELLOW);
+  gfx.RoundRectFilled(28, 137, 38, 153, 3, BLACK);
+  gfx.RoundRectFilled(40, 137, 50, 153, 3, BLACK);
+  }
+  else if (remoteBatVal > 10 && remoteBatVal <= 25) {
+  gfx.RoundRectFilled(4, 137, 14, 153, 3, ORANGE);
+  gfx.RoundRectFilled(16, 137, 26, 153, 3, BLACK);
+  gfx.RoundRectFilled(28, 137, 38, 153, 3, BLACK);
+  gfx.RoundRectFilled(40, 137, 50, 153, 3, BLACK);
+  }
+  else if (remoteBatVal > 0 && remoteBatVal <= 10) {
+  if (remoteBatteryWarning) {
+    gfx.RoundRectFilled(4, 137, 14, 153, 3, RED);
+  }
+  else {
+    gfx.RoundRectFilled(4, 137, 14, 153, 3, BLACK);
+  }
+  remoteBatteryWarning = !remoteBatteryWarning;
+  gfx.RoundRectFilled(16, 137, 26, 153, 3, BLACK);
+  gfx.RoundRectFilled(28, 137, 38, 153, 3, BLACK);
+  gfx.RoundRectFilled(40, 137, 50, 153, 3, BLACK);
   }
 }
