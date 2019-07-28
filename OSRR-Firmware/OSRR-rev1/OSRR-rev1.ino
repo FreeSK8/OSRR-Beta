@@ -1,6 +1,6 @@
 
 /*
-  Name:    OSRR-FirmwareV1.ino
+  Name:    OSRR-rev1.ino
   Created: 01-03-2019
   Author:  DerelictRobot / Andrew Dresner
   Source Attribution: SolidGeek/StefanMeGit
@@ -11,9 +11,21 @@
 #define ESC_UNITY             // ESC_UNITY for UART communication with a UNITY
 //#define ESC_VESC                // ESC_VESC for UART communication with a VESC 4.12-6.6
 
-const int wheelDiameter = 200;  //Wheel diameter in MM.
-const float gearRatio = 0.25; //(Gear Ratio = Motor Gear Tooth Count)/(Wheel Gear Tooth Count)
-                              // ie: 0.25 = 4:1 = 15T/60T
+// - Choose Metric or Imperial
+//#define METRIC
+#define IMPERIAL
+
+// Defining variables to hold values for speed and distance calculation
+float wheelDiameter = 200;  //Wheel diameter in MM.
+float wheelPulley = 60;     //Wheel Pulley Tooth Count
+float motorPulley = 15;     //Motor Pulley Tooth Count
+float motorPoles = 14;      //Motor Poles - 14 default
+
+float gearRatio;                      
+float ratioRpmSpeed;
+float ratioPulseDistance;
+float distanceValue;
+                              
 #include <Wire.h>
 #include "ESP8266WiFi.h"
 #include "GFX4dIoD9.h"
@@ -116,6 +128,12 @@ int max_ads = 1700;
 int adc_max_limit = 2000;
 
 
+void calculateRatios()  {
+  gearRatio = (motorPulley) / (wheelPulley);                              
+  ratioRpmSpeed = (gearRatio * 60 * wheelDiameter * 3.14156) / ((motorPoles / 2) * 1000000);
+  ratioPulseDistance = (gearRatio * wheelDiameter * 3.14156) / ((motorPoles * 3) * 1000000);
+
+}
 
 void setup() {
 
@@ -154,6 +172,8 @@ void setup() {
   delay(100);
 
   UART.nunchuck.lowerButton = false;
+
+  calculateRatios();
 
 }
 
@@ -197,34 +217,27 @@ void loop() {
 
 void updateLCD()  {
   if ( UART.getVescValues() ) {
-
-    int calcMPH = (((wheelDiameter / 304.8) * 3.14159 * (((UART.data.rpm) / 7) * gearRatio) * 60) / 5280);
+#ifdef IMPERIAL
+int speedValue = ((ratioRpmSpeed * UART.data.rpm) * 0.621371);
+#endif
+#ifdef METRIC
+int speedValue = (ratioRpmSpeed * UART.data.rpm);
+#endif    
     gfx.MoveTo(15, 5);
     gfx.TextColor(YELLOW, BLACK); gfx.Font(2);  gfx.TextSize(3);
-    if (calcMPH >= 10) {
-      gfx.print(String(calcMPH));
+    if (speedValue >= 10) {
+      gfx.print(String(speedValue));
     }
-    else if (calcMPH < 0) {
-      gfx.print(String(calcMPH));
+    else if (speedValue < 0) {
+      gfx.print(String(speedValue));
     }
-    else if (calcMPH <= 9) {
+    else if (speedValue <= 9) {
       gfx.print("0");
-      gfx.print(String(calcMPH));
+      gfx.print(String(speedValue));
     }
 
     
-    
-//    if (throttle > 130) {
-//    int throttleBar = map(throttle, 128, 255, 50, 0);    
-//    gfx.RectangleFilled(0,50,5,throttleBar,CYAN);
-//    } else if (throttle < 125)  {
-//    int throttleBar = map(throttle, 127, 0, 50, 0);    
-//    gfx.RectangleFilled(0,50,5,throttleBar,ORANGE);     
-//    } else  {
-//      gfx.RectangleFilled(0,50,5,0,BLACK);
-//    }
-
-    gfx.MoveTo(0, 100);
+    gfx.MoveTo(0, 80);
     gfx.TextColor(RED, BLACK); gfx.Font(2);  gfx.TextSize(1);
     gfx.print("V ");
     gfx.println(String(UART.data.inpVoltage));
@@ -244,24 +257,38 @@ void updateLCD()  {
 //
 //
 //
-//    gfx.TextColor(ORANGE, BLACK);
-//    gfx.print("B ");
-//    int currentBatWatts = (UART.data.avgInputCurrent * 2) * (UART.data.inpVoltage);
-//    if (currentBatWatts >= 100) {
-//      gfx.println(String(currentBatWatts));
-//    } else if (currentBatWatts >= 10) {
-//      gfx.print("0");
-//      gfx.println(String(currentBatWatts));
-//    } else if (currentBatWatts <= 9) {
-//      gfx.print("00");
-//      gfx.println(String(currentBatWatts));
-//    }
+    gfx.TextColor(ORANGE, BLACK);
+    gfx.print("W ");
+    int currentBatWatts = (UART.data.avgInputCurrent * 2) * (UART.data.inpVoltage);
+    if (currentBatWatts >= 1000) {
+      gfx.println(String(currentBatWatts));
+      }
+      else if (currentBatWatts < 0) {
+      gfx.println("-RGN");  
+      }
+     else if (currentBatWatts >= 100) {
+      gfx.print("0");
+      gfx.println(String(currentBatWatts));
+      }       
+     else if (currentBatWatts >= 10) {
+      gfx.print("00");
+      gfx.println(String(currentBatWatts));
+      } 
+    else if (currentBatWatts <= 9) {
+      gfx.print("000");
+      gfx.println(String(currentBatWatts));
+    }
 
 
-//    gfx.TextColor(YELLOW, BLACK);
-//    gfx.print("T ");
-//    float calcODO = ((0.492126 * 3.14159 * ((UART.data.tachometerAbs) / 7) * 0.23) / 5280);
-//    gfx.println(String(calcODO));
+    gfx.TextColor(CYAN, BLACK);
+    gfx.print("T ");
+    #ifdef IMPERIAL
+    distanceValue = (ratioPulseDistance * UART.data.tachometerAbs) * 0.621371;
+    #endif
+    #ifdef METRIC
+    distanceValue = (ratioPulseDistance * UART.data.tachometerAbs);
+    #endif    
+    gfx.println(String(distanceValue));
 
 //    successCount++;
 //    gfx.TextColor(CYAN, BLACK); gfx.Font(2);  gfx.TextSize(1);
