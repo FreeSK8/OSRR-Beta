@@ -133,7 +133,7 @@ int adc_max_limit = 2000;
 
 
 int16_t remoteBatRaw;
-int min_ads_bat = 0;
+int min_ads_bat = 950;
 int max_ads_bat = 1400;
 int adc_max_bat_limit = 2000;
 
@@ -236,7 +236,7 @@ int speedValue = ((ratioRpmSpeed * UART.data.rpm) * 0.621371);
 #ifdef METRIC
 int speedValue = (ratioRpmSpeed * UART.data.rpm);
 #endif    
-    gfx.MoveTo(15, 5);
+    gfx.MoveTo(15, 10);
     gfx.TextColor(YELLOW, BLACK); gfx.Font(2);  gfx.TextSize(3);
     if (speedValue >= 10) {
       gfx.print(String(speedValue));
@@ -353,25 +353,25 @@ void updateRemoteBattery() {
 void remoteBatteryDisplay(int remoteBatVal) {
   gfx.RoundRect(2,135,52,155, 3, LIME);
   if (remoteBatVal > 75)  {
-  gfx.RoundRectFilled(4, 137, 14, 153, 3, ORANGE);
-  gfx.RoundRectFilled(16, 137, 26, 153, 3, YELLOW);
-  gfx.RoundRectFilled(28, 137, 38, 153, 3, LIMEGREEN);
-  gfx.RoundRectFilled(40, 137, 50, 153, 3, LIMEGREEN);
+  gfx.RoundRectFilled(4, 137, 14, 153, 3, RED);
+  gfx.RoundRectFilled(16, 137, 26, 153, 3, ORANGE);
+  gfx.RoundRectFilled(28, 137, 38, 153, 3, YELLOW);
+  gfx.RoundRectFilled(40, 137, 50, 153, 3, LIME);
   }
   else if (remoteBatVal > 50 && remoteBatVal <= 75) {
-  gfx.RoundRectFilled(4, 137, 14, 153, 3, ORANGE);
-  gfx.RoundRectFilled(16, 137, 26, 153, 3, YELLOW);
-  gfx.RoundRectFilled(28, 137, 38, 153, 3, LIMEGREEN);
+  gfx.RoundRectFilled(4, 137, 14, 153, 3, RED);
+  gfx.RoundRectFilled(16, 137, 26, 153, 3, ORANGE);
+  gfx.RoundRectFilled(28, 137, 38, 153, 3, YELLOW);
   gfx.RoundRectFilled(40, 137, 50, 153, 3, BLACK);
   }
   else if (remoteBatVal > 25 && remoteBatVal <= 50) {
-  gfx.RoundRectFilled(4, 137, 14, 153, 3, ORANGE);
-  gfx.RoundRectFilled(16, 137, 26, 153, 3, YELLOW);
+  gfx.RoundRectFilled(4, 137, 14, 153, 3, RED);
+  gfx.RoundRectFilled(16, 137, 26, 153, 3, ORANGE);
   gfx.RoundRectFilled(28, 137, 38, 153, 3, BLACK);
   gfx.RoundRectFilled(40, 137, 50, 153, 3, BLACK);
   }
   else if (remoteBatVal > 10 && remoteBatVal <= 25) {
-  gfx.RoundRectFilled(4, 137, 14, 153, 3, ORANGE);
+  gfx.RoundRectFilled(4, 137, 14, 153, 3, RED);
   gfx.RoundRectFilled(16, 137, 26, 153, 3, BLACK);
   gfx.RoundRectFilled(28, 137, 38, 153, 3, BLACK);
   gfx.RoundRectFilled(40, 137, 50, 153, 3, BLACK);
