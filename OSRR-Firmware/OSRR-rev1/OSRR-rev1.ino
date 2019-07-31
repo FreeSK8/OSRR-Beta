@@ -99,7 +99,6 @@ int timeoutMax = 500;
 unsigned long lastDataCheck;
 bool remoteBatteryWarning = true;
 bool connBlink = true;
-int connPulse = 1;
 int connBlinkCount = 0;
 unsigned long failCount = 0;
 unsigned long successCount = 0;
@@ -133,7 +132,7 @@ int adc_max_limit = 2000;
 
 
 int16_t remoteBatRaw;
-int min_ads_bat = 950;
+int min_ads_bat = 1000;
 int max_ads_bat = 1400;
 int adc_max_bat_limit = 2000;
 
@@ -143,6 +142,7 @@ void calculateRatios()  {
   gearRatio = (motorPulley) / (wheelPulley);                              
   ratioRpmSpeed = (gearRatio * 60 * wheelDiameter * 3.14156) / ((motorPoles / 2) * 1000000);
   ratioPulseDistance = (gearRatio * wheelDiameter * 3.14156) / ((motorPoles * 3) * 1000000);
+
 }
 
 void setup() {
@@ -162,24 +162,24 @@ void setup() {
   gfx.println(" ONLINE");
   delay(500);
   gfx.Cls();
-  delay(150);
+  delay(100);
 
   /** Setup UART port (Serial on Atmega32u4) */
   Serial.begin(115200);
 //  while (!Serial) {
 //    ;
 //  }
-  delay(100);
+  delay(50);
   /** Define which ports to use as UART */
   UART.setSerialPort(&Serial);
 
-  delay(100);
+  delay(50);
   updateLCD();
-  delay(100);
+  delay(50);
   ads.setGain(GAIN_TWOTHIRDS);  // 2/3x gain +/- 6.144V  1 bit = 3mV      0.1875mV (default)
   //  ads.setGain(GAIN_ONE);        // 1x gain   +/- 4.096V  1 bit = 2mV      0.125mV
   ads.begin();
-  delay(100);
+  delay(50);
 
   UART.nunchuck.lowerButton = false;
 
@@ -249,11 +249,10 @@ int speedValue = (ratioRpmSpeed * UART.data.rpm);
     }
 
     
-    gfx.MoveTo(12, 80);
+    gfx.MoveTo(12, 70);
     gfx.TextColor(RED, BLACK); gfx.Font(2);  gfx.TextSize(1);
     gfx.print("V ");
-    float inputVoltage = UART.data.inpVoltage;
-    gfx.print(String(inputVoltage, 1));
+    gfx.print(String(UART.data.inpVoltage, 1));
 
 //    gfx.TextColor(CYAN, BLACK);
 //    gfx.print("M ");
@@ -270,7 +269,7 @@ int speedValue = (ratioRpmSpeed * UART.data.rpm);
 //
 //
 //
-    gfx.MoveTo(12, 96);
+    gfx.MoveTo(12, 90);
     gfx.TextColor(ORANGE, BLACK);
     gfx.print("W ");
     int currentBatWatts = (UART.data.avgInputCurrent * 2) * (UART.data.inpVoltage);
@@ -293,7 +292,7 @@ int speedValue = (ratioRpmSpeed * UART.data.rpm);
       gfx.print(String(currentBatWatts));
     }
 
-    gfx.MoveTo(12, 112);
+    gfx.MoveTo(12, 110);
     gfx.TextColor(CYAN, BLACK);
     gfx.print("T ");
     #ifdef IMPERIAL
@@ -304,7 +303,7 @@ int speedValue = (ratioRpmSpeed * UART.data.rpm);
     #endif    
     gfx.print(String(distanceValue));
 
-    updateRemoteBattery();
+    
 
 //    successCount++;
 //    gfx.TextColor(CYAN, BLACK); gfx.Font(2);  gfx.TextSize(1);
@@ -332,6 +331,7 @@ int speedValue = (ratioRpmSpeed * UART.data.rpm);
     }
 
   }
+  updateRemoteBattery();
 }
 
 void updateRemoteBattery() {
@@ -341,23 +341,23 @@ void updateRemoteBattery() {
    batteryLevel = constrain(batteryLevel, 0, 100);
    remoteBatteryDisplay(batteryLevel);
    
-    gfx.MoveTo(12, 64);
-    gfx.TextColor(RED, BLACK); gfx.Font(2);  gfx.TextSize(1);
-    gfx.print("R ");
-    gfx.print(String(remoteBatRaw));
+//    gfx.MoveTo(12, 64);
+//    gfx.TextColor(RED, BLACK); gfx.Font(2);  gfx.TextSize(1);
+//    gfx.print("R ");
+//    gfx.print(String(remoteBatRaw));
 
 }
 
 
 void remoteBatteryDisplay(int remoteBatVal) {
   gfx.RoundRect(2,135,52,155, 3, LIME);
-  if (remoteBatVal > 75)  {
+  if (remoteBatVal > 70)  {
   gfx.RoundRectFilled(4, 137, 14, 153, 3, RED);
   gfx.RoundRectFilled(16, 137, 26, 153, 3, ORANGE);
   gfx.RoundRectFilled(28, 137, 38, 153, 3, YELLOW);
   gfx.RoundRectFilled(40, 137, 50, 153, 3, LIME);
   }
-  else if (remoteBatVal > 50 && remoteBatVal <= 75) {
+  else if (remoteBatVal > 50 && remoteBatVal <= 70) {
   gfx.RoundRectFilled(4, 137, 14, 153, 3, RED);
   gfx.RoundRectFilled(16, 137, 26, 153, 3, ORANGE);
   gfx.RoundRectFilled(28, 137, 38, 153, 3, YELLOW);
@@ -375,7 +375,7 @@ void remoteBatteryDisplay(int remoteBatVal) {
   gfx.RoundRectFilled(28, 137, 38, 153, 3, BLACK);
   gfx.RoundRectFilled(40, 137, 50, 153, 3, BLACK);
   }
-  else if (remoteBatVal > 0 && remoteBatVal <= 10) {
+  else if (remoteBatVal <= 10) {
   if (remoteBatteryWarning) {
     gfx.RoundRectFilled(4, 137, 14, 153, 3, RED);
   }
