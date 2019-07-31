@@ -143,7 +143,6 @@ void calculateRatios()  {
   gearRatio = (motorPulley) / (wheelPulley);                              
   ratioRpmSpeed = (gearRatio * 60 * wheelDiameter * 3.14156) / ((motorPoles / 2) * 1000000);
   ratioPulseDistance = (gearRatio * wheelDiameter * 3.14156) / ((motorPoles * 3) * 1000000);
-
 }
 
 void setup() {
