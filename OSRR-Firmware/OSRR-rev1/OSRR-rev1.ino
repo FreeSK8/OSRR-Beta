@@ -351,7 +351,7 @@ void updateRemoteBattery() {
 
 
 void remoteBatteryDisplay(int remoteBatVal) {
-  if (remoteBatVal > 90)  {
+  if (remoteBatVal > 95)  {
     gfx.RoundRectFilled(4, 137, 14, 153, 3, RED);
     gfx.RoundRectFilled(16, 137, 26, 153, 3, ORANGE);
     gfx.RoundRectFilled(28, 137, 38, 153, 3, YELLOW);
