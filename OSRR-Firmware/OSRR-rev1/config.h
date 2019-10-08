@@ -21,8 +21,10 @@ float ratioPulseDistance;
 float distanceValue;
 
 
-unsigned long previousMillis = 0;
-const long interval = 250;
+unsigned long previousLCDUpdate = 0;
+unsigned long previousVescUpdate = 0;
+const long LCDUpdateInterval = 250;
+const long VescUpdateInterval = 20;
 
 int16_t thumbwheelVal0;
 int16_t thumbwheelVal1;
