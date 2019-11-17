@@ -82,35 +82,37 @@ void setup() {
 
 void loop() {
 
-  thumbwheelVal0 = ads.readADC_SingleEnded(0);
-  // thumbwheelVal1 = ads.readADC_SingleEnded(1);
-  if (thumbwheelVal0 > adc_max_limit) {
-    throttle = 127;
-  }
-  else
-  {
-    throttle = map(thumbwheelVal0, min_ads, max_ads, 0, 255);
-    throttle = constrain(throttle, 0, 255);
-  }
-  /** The lowerButton is used to set cruise control ON */
-  //      UART.nunchuck.lowerButton = true;
-
-  /** The lowerButton is used to set cruise control OFF */
-  UART.nunchuck.lowerButton = false;
-  /** The valueY is used to control the speed, where 127 is the middle = no current */
-  UART.nunchuck.valueY = throttle;
-  /** Call the function setNunchuckValues to send the current nunchuck values to the VESC */
-  UART.setNunchuckValues();
-  delay(20); //approx 48hz
-
-  //remoteRSSIRaw = ads.readADC_SingleEnded(2);
-
-
   unsigned long currentMillis = millis();
 
-  if (currentMillis - previousMillis >= interval) {
-    previousMillis = currentMillis;
+  if (currentMillis - previousVescUpdate >= VescUpdateInterval) {
+    thumbwheelVal0 = ads.readADC_SingleEnded(0);
+    // thumbwheelVal1 = ads.readADC_SingleEnded(1);
+    if (thumbwheelVal0 > adc_max_limit) {
+      throttle = 127;
+    }
+    else
+    {
+      throttle = map(thumbwheelVal0, min_ads, max_ads, 0, 255);
+      throttle = constrain(throttle, 0, 255);
+    }
+    /** The lowerButton is used to set cruise control ON */
+    //      UART.nunchuck.lowerButton = true;
+  
+    /** The lowerButton is used to set cruise control OFF */
+    UART.nunchuck.lowerButton = false;
+    /** The valueY is used to control the speed, where 127 is the middle = no current */
+    UART.nunchuck.valueY = throttle;
+    /** Call the function setNunchuckValues to send the current nunchuck values to the VESC */
+    UART.setNunchuckValues();
+
+    //remoteRSSIRaw = ads.readADC_SingleEnded(2);
+
+    previousVescUpdate = currentMillis;
+  }
+  
+  if (currentMillis - previousLCDUpdate >= LCDUpdateInterval) {
     updateLCD();
+    previousLCDUpdate = currentMillis;
   }
 
   yield(); // Required for ESP
