@@ -1,48 +1,65 @@
 
 /*
-  Name:    OSRR-rev1.ino
+  Name:    OSRR-Firmware-Beta-v11.ino
   Created: 01-03-2019
   Author:  DerelictRobot / Andrew Dresner
   Source Attribution: SolidGeek/StefanMeGit
-  Description:  Null.
+  Description:  OSRR Beta Firmware v1.1, for beta hardware version v0.3.
 */
 
+#include <EEPROM.h>
 #include <Wire.h>
-#include "ESP8266WiFi.h"
+#include <ESP8266WiFi.h>
+#include <DNSServer.h>
+
+#include <ESP8266WebServer.h>
+
+#include "functions.h"
+
 #include "GFX4dIoD9.h"
 #include <Adafruit_ADS1015.h>
 #include "config.h"
-
-#ifdef ESC_VESC
-#include <VescUart.h>
-#endif
-#ifdef ESC_UNITY
-#include <VescUartUnity.h>
-#endif
 
 
 /** Initiate VescUart class */
 // Initiate VescUart class for UART communication
 #ifdef ESC_UNITY
+#include <VescUartUnity.h>
 VescUartUnity UART;
 #endif
 #ifdef ESC_VESC
+#include <VescUart.h>
 VescUart UART;
 #endif
 
+
 GFX4dIoD9 gfx = GFX4dIoD9();
+
 Adafruit_ADS1015 ads;     /* Use thi for the 12-bit version */
 
-void setup() {
 
+char apname[32];
+const byte DNS_PORT = 53;
+IPAddress apIP(10, 5, 5, 5);
+
+DNSServer dnsServer;
+ESP8266WebServer webServer( 80 );
+
+#include "captiveportal.h"
+
+String mac;
+
+void setup() 
+{
+  EEPROM.begin(512);
+  WiFi.softAPdisconnect(true);
   delay(100);
-  
   gfx.begin();
   gfx.Cls();
   gfx.ScrollEnable(false);
   gfx.BacklightOn(true);
-  gfx.Orientation(PORTRAIT);
-  //  gfx.SmoothScrollSpeed(5);
+  gfx.Orientation(PORTRAIT_R);
+  
   gfx.TextColor(CYAN, BLACK); gfx.Font(2);  gfx.TextSize(1);
   // gfx.TextWindow(0, 0, 80, 82, ORANGE, BLACK);
   gfx.println("      ");
@@ -50,7 +67,7 @@ void setup() {
   gfx.println(" ONLINE");
   delay(500);
   gfx.Cls();
-  delay(100);
+  delay(50);
 
   /** Setup UART port (Serial on Atmega32u4) */
   Serial.begin(115200);
@@ -61,37 +78,40 @@ void setup() {
   /** Define which ports to use as UART */
   UART.setSerialPort(&Serial);
 
-  delay(50);
-  updateLCD();                                //Update values on LCD
-  gfx.RoundRect(2, 135, 52, 155, 3, LIME);    //Draw Remote Battery Meter Border
+
   delay(50);
   ads.setGain(GAIN_TWOTHIRDS);  // 2/3x gain +/- 6.144V  1 bit = 3mV      0.1875mV (default)
-  //  ads.setGain(GAIN_ONE);        // 1x gain   +/- 4.096V  1 bit = 2mV      0.125mV
+
   ads.begin();
   delay(50);
 
   UART.nunchuck.lowerButton = false;
-  
-  calculateRatios();
-  
+
+    readConfigEEPROM();  
+    calculateRatios();
+    delay(10);
+
+    //check thumbwheel position, goto setup if held at full brake position. 
+    readThrottle();
+    if (throttle < 20)
+      {
+        webConfig();
+      }
+      
+  updateLCD();                                //Update values on LCD
+  gfx.RoundRect(2, 135, 52, 155, 3, LIME);    //Draw Remote Battery Meter Border
+      
 }
 
+void loop() 
+{
 
+  unsigned long currentMillis = millis();
 
+  if (currentMillis - previousVescUpdate >= VescUpdateInterval) {
 
+  readThrottle();
 
-void loop() {
-
-  thumbwheelVal0 = ads.readADC_SingleEnded(0);
-  // thumbwheelVal1 = ads.readADC_SingleEnded(1);
-  if (thumbwheelVal0 > adc_max_limit) {
-    throttle = 127;
-  }
-  else
-  {
-    throttle = map(thumbwheelVal0, min_ads, max_ads, 0, 255);
-    throttle = constrain(throttle, 0, 255);
-  }
   /** The lowerButton is used to set cruise control ON */
   //      UART.nunchuck.lowerButton = true;
 
@@ -101,16 +121,15 @@ void loop() {
   UART.nunchuck.valueY = throttle;
   /** Call the function setNunchuckValues to send the current nunchuck values to the VESC */
   UART.setNunchuckValues();
-  delay(20); //approx 48hz
 
   //remoteRSSIRaw = ads.readADC_SingleEnded(2);
 
-
-  unsigned long currentMillis = millis();
-
-  if (currentMillis - previousMillis >= interval) {
-    previousMillis = currentMillis;
+    previousVescUpdate = currentMillis;
+  }
+  
+  if (currentMillis - previousLCDUpdate >= LCDUpdateInterval) {
     updateLCD();
+    previousLCDUpdate = currentMillis;
   }
 
   yield(); // Required for ESP
@@ -292,4 +311,81 @@ void remoteBatteryDisplay(int remoteBatVal) {
     gfx.RoundRectFilled(28, 137, 38, 153, 3, BLACK);
     gfx.RoundRectFilled(40, 137, 50, 153, 3, BLACK);
   }
+}
+
+
+void readThrottle()
+{
+  thumbwheelVal0 = ads.readADC_SingleEnded(0);
+    if (thumbwheelVal0 > adc_max_limit) {
+      throttle = 127;
+    }
+    else
+    {
+      throttle = map(thumbwheelVal0, min_ads, max_ads, 0, 255);
+      throttle = constrain(throttle, 0, 255);
+    }
+}
+
+
+void initWebConfig()
+{
+  WiFi.softAPdisconnect(true);
+  mac = WiFi.macAddress();
+  mac.replace(":","");
+
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
+
+  mac.remove( 0, 6 );
+  mac = "OSRR-" + mac;
+  mac.toCharArray( apname, 32 );
+  WiFi.softAP( apname );
+
+  dnsServer.start(DNS_PORT, "*", apIP);
+  dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
+  dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
+
+  webServer.on("/config.php",handleConfig);
+  
+  webServer.onNotFound( handleNotFound ); //will use for default, just give option page
+  webServer.begin();
+}
+
+void webConfig()
+{
+  
+  gfx.TextColor(ORANGE, BLACK); gfx.Font(2);  gfx.TextSize(1);
+  gfx.println("      ");
+  gfx.println(" SETUP");
+  gfx.println("  MODE");
+  initWebConfig();
+  delay(250);
+  while(1)
+  {
+  dnsServer.processNextRequest();
+  webServer.handleClient();
+  delay(1);
+  }
+}
+
+
+
+bool readConfigEEPROM()
+{
+  motorPulley = EEPROM.read(addr_motorPulley); 
+  wheelPulley = EEPROM.read(addr_wheelPulley); 
+  wheelDiameter = EEPROM.read(addr_wheelDiameter);
+  calculateRatios();
+}
+
+void writeConfigEEPROM(int mp, int wp, int wd)
+{
+  EEPROM.write(addr_motorPulley, mp);
+  EEPROM.write(addr_wheelPulley, wp);
+  EEPROM.write(addr_wheelDiameter, wd);
+  //if success, need to add check
+  EEPROM.commit();
+  EEPROM.end();
+  delay(100);
 }
