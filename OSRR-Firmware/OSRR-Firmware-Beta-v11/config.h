@@ -2,18 +2,31 @@
 #define CONFIG_H
 
 // - Choose UART protocol:
-#define ESC_UNITY             // ESC_UNITY for UART communication with a UNITY
-//#define ESC_VESC                // ESC_VESC for UART communication with a VESC 4.12-6.6
+//define ESC_UNITY             // ESC_UNITY for UART communication with a UNITY
+#define ESC_VESC                // ESC_VESC for UART communication with a VESC 4.12-6.6
 
 // - Choose Metric or Imperial
 //#define METRIC
 #define IMPERIAL
 
+// - Choose Simple or Full Display mode
+// #define SIMPLE
+// #define FULL
+
 // Defining variables to hold values for speed and distance calculation
-float wheelDiameter = 200;  //Wheel diameter in MM.
-float wheelPulley = 60;     //Wheel Pulley Tooth Count
-float motorPulley = 15;     //Motor Pulley Tooth Count
+int wheelDiameter = 145;  //Wheel diameter in MM. 
+int wheelPulley = 60;     //Wheel Pulley Tooth Count
+int motorPulley = 15;     //Motor Pulley Tooth Count
 float motorPoles = 14;      //Motor Poles - 14 default
+
+const int addr_wheelDiameter = 10;
+const int addr_wheelPulley = 20;
+const int addr_motorPulley = 30;
+
+int e_wheelDiameter;  //Wheel diameter in MM. 
+int e_wheelPulley;     //Wheel Pulley Tooth Count
+int e_motorPulley;     //Motor Pulley Tooth Count
+
 
 float gearRatio;
 float ratioRpmSpeed;
@@ -45,13 +58,13 @@ int adc_max_bat_limit = 2000;
 int16_t remoteRSSIRaw;
 
 void calculateRatios()  {
-  gearRatio = (motorPulley) / (wheelPulley);
-  ratioRpmSpeed = (gearRatio * 60 * wheelDiameter * 3.14156) / ((motorPoles / 2) * 1000000);
-  ratioPulseDistance = (gearRatio * wheelDiameter * 3.14156) / ((motorPoles * 3) * 1000000);
+  gearRatio = ( (float)motorPulley / (float)wheelPulley );
+  ratioRpmSpeed = (gearRatio * 60 * (float)wheelDiameter * 3.14156) / ((motorPoles / 2) * 1000000);
+  ratioPulseDistance = (gearRatio * (float)wheelDiameter * 3.14156) / ((motorPoles * 3) * 1000000);
 
 }
 
-
+//UNUSED (Future ToDo)
 #ifdef ESC_UNITY
 // Defining struct to handle callback data for UNITY
 struct callback {
@@ -74,6 +87,7 @@ struct callback {
 } returnData;
 #endif
 
+//UNUSED
 #ifdef ESC_VESC
 // Defining struct to handle callback data for VESC
 struct callback {
@@ -92,7 +106,7 @@ struct callback {
 } returnData;
 #endif
 
-
+// UNUSED
 // Defining struct to hold stats
 struct stats {
   float maxSpeed;
@@ -115,6 +129,5 @@ int connBlinkCount = 0;
 unsigned long failCount = 0;
 unsigned long successCount = 0;
 
-//struct vescValues data;
 
 #endif
