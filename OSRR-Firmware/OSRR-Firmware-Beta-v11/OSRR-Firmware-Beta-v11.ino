@@ -15,6 +15,7 @@
 #include <ESP8266WebServer.h>
 
 #include "functions.h"
+#include "display.h"
 
 #include "GFX4dIoD9.h"
 #include <Adafruit_ADS1015.h>
@@ -60,12 +61,7 @@ void setup()
   gfx.BacklightOn(true);
   gfx.Orientation(PORTRAIT_R);
   
-  gfx.TextColor(CYAN, BLACK); gfx.Font(2);  gfx.TextSize(1);
-  // gfx.TextWindow(0, 0, 80, 82, ORANGE, BLACK);
-  gfx.println("      ");
-  gfx.println("  OSRR");
-  gfx.println(" ONLINE");
-  delay(500);
+  bootlogo();
   gfx.Cls();
   delay(50);
 
