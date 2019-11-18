@@ -121,8 +121,6 @@ void loop()
   UART.nunchuck.valueY = throttle;
   /** Call the function setNunchuckValues to send the current nunchuck values to the VESC */
   UART.setNunchuckValues();
-  delay(20); //approx 48hz
-
 
   //remoteRSSIRaw = ads.readADC_SingleEnded(2);
 
