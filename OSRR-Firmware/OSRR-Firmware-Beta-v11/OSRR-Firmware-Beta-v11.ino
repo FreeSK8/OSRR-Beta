@@ -11,12 +11,11 @@
 #include <Wire.h>
 #include <ESP8266WiFi.h>
 #include <DNSServer.h>
-#include <WiFiClient.h>
+
 #include <ESP8266WebServer.h>
-#include <FS.h>   //Include File System Headers
-#include "elapsedMillis.h"
+
 #include "functions.h"
-#include <ESP8266HTTPClient.h>
+
 #include "GFX4dIoD9.h"
 #include <Adafruit_ADS1015.h>
 #include "config.h"
@@ -38,7 +37,6 @@ GFX4dIoD9 gfx = GFX4dIoD9();
 
 Adafruit_ADS1015 ads;     /* Use thi for the 12-bit version */
 
-HTTPClient http;
 
 char apname[32];
 const byte DNS_PORT = 53;
