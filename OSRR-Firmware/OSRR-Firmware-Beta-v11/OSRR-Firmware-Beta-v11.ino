@@ -6,21 +6,13 @@
   Source Attribution: SolidGeek/StefanMeGit
   Description:  OSRR Beta Firmware v1.1, for beta hardware version v0.3.
 */
-
-#include <EEPROM.h>
 #include <Wire.h>
-#include <ESP8266WiFi.h>
-#include <DNSServer.h>
-
-#include <ESP8266WebServer.h>
-
-#include "functions.h"
 #include "display.h"
-
-#include "GFX4dIoD9.h"
 #include <Adafruit_ADS1015.h>
 #include "config.h"
 
+//Initiate GXF4dIoD9 graphics class
+GFX4dIoD9 gfx = GFX4dIoD9();
 
 /** Initiate VescUart class */
 // Initiate VescUart class for UART communication
@@ -33,67 +25,49 @@ VescUartUnity UART;
 VescUart UART;
 #endif
 
-
-GFX4dIoD9 gfx = GFX4dIoD9();
-
-Adafruit_ADS1015 ads;     /* Use thi for the 12-bit version */
-
-
-char apname[32];
-const byte DNS_PORT = 53;
-IPAddress apIP(10, 5, 5, 5);
-
-DNSServer dnsServer;
-ESP8266WebServer webServer( 80 );
-
 #include "captiveportal.h"
-
-String mac;
+Adafruit_ADS1015 ads;     /* Use thi for the 12-bit version */
 
 void setup() 
 {
   EEPROM.begin(512);
   WiFi.softAPdisconnect(true);
-  delay(100);
+
   gfx.begin();
   gfx.Cls();
   gfx.ScrollEnable(false);
   gfx.BacklightOn(true);
-  gfx.Orientation(PORTRAIT_R);
+  gfx.Orientation(PORTRAIT);
   
   bootlogo();
   gfx.Cls();
   delay(50);
 
-  /** Setup UART port (Serial on Atmega32u4) */
+  /** Setup UART port (Serial on ESP8266) */
   Serial.begin(115200);
   //  while (!Serial) {
   //    ;
   //  }
-  delay(50);
+
   /** Define which ports to use as UART */
   UART.setSerialPort(&Serial);
 
-
-  delay(50);
   ads.setGain(GAIN_TWOTHIRDS);  // 2/3x gain +/- 6.144V  1 bit = 3mV      0.1875mV (default)
 
   ads.begin();
-  delay(50);
 
   UART.nunchuck.lowerButton = false;
 
-    readConfigEEPROM();  
-    calculateRatios();
-    delay(10);
+  bool forceconfig = !readConfigEEPROM();
 
-    //check thumbwheel position, goto setup if held at full brake position. 
-    readThrottle();
-    if (throttle < 20)
-      {
-        webConfig();
-      }
-      
+  //check thumbwheel position, goto setup if held at full brake position. 
+  readThrottle();
+  
+  if( throttle < 20 || forceconfig )
+  {
+    webConfig();
+  }
+    
   updateLCD();                                //Update values on LCD
   gfx.RoundRect(2, 135, 52, 155, 3, LIME);    //Draw Remote Battery Meter Border
       
@@ -104,26 +78,27 @@ void loop()
 
   unsigned long currentMillis = millis();
 
-  if (currentMillis - previousVescUpdate >= VescUpdateInterval) {
-
-  readThrottle();
-
-  /** The lowerButton is used to set cruise control ON */
-  //      UART.nunchuck.lowerButton = true;
-
-  /** The lowerButton is used to set cruise control OFF */
-  UART.nunchuck.lowerButton = false;
-  /** The valueY is used to control the speed, where 127 is the middle = no current */
-  UART.nunchuck.valueY = throttle;
-  /** Call the function setNunchuckValues to send the current nunchuck values to the VESC */
-  UART.setNunchuckValues();
-
-  //remoteRSSIRaw = ads.readADC_SingleEnded(2);
-
+  if( currentMillis - previousVescUpdate >= VescUpdateInterval ) 
+  {
+    readThrottle();
+  
+    /** The lowerButton is used to set cruise control ON */
+    //      UART.nunchuck.lowerButton = true;
+  
+    /** The lowerButton is used to set cruise control OFF */
+    UART.nunchuck.lowerButton = false;
+    /** The valueY is used to control the speed, where 127 is the middle = no current */
+    UART.nunchuck.valueY = throttle;
+    /** Call the function setNunchuckValues to send the current nunchuck values to the VESC */
+    UART.setNunchuckValues();
+  
+    //remoteRSSIRaw = ads.readADC_SingleEnded(2);
+  
     previousVescUpdate = currentMillis;
   }
   
-  if (currentMillis - previousLCDUpdate >= LCDUpdateInterval) {
+  if( currentMillis - previousLCDUpdate >= LCDUpdateInterval ) 
+  {
     updateLCD();
     previousLCDUpdate = currentMillis;
   }
@@ -131,32 +106,36 @@ void loop()
   yield(); // Required for ESP
 }
 
+char output[20];
+double inpVoltage = 0;
+
 void updateLCD()  {
   if ( UART.getVescValues() ) {
+    
 #ifdef IMPERIAL
     int speedValue = ((ratioRpmSpeed * UART.data.rpm) * 0.621371);
 #endif
 #ifdef METRIC
     int speedValue = (ratioRpmSpeed * UART.data.rpm);
 #endif
+
     gfx.MoveTo(15, 10);
     gfx.TextColor(YELLOW, BLACK); gfx.Font(2);  gfx.TextSize(3);
-    if (speedValue >= 10) {
-      gfx.print(String(speedValue));
-    }
-    else if (speedValue < 0) {
-      gfx.print(String(speedValue));
-    }
-    else if (speedValue <= 9) {
-      gfx.print("0");
-      gfx.print(String(speedValue));
-    }
-
+    
+    sprintf(output,"%02d",speedValue);
+    gfx.print(String(output));
 
     gfx.MoveTo(12, 70);
-    gfx.TextColor(RED, BLACK); gfx.Font(2);  gfx.TextSize(1);
-    gfx.print("V ");
-    gfx.print(String(UART.data.inpVoltage, 1));
+
+    inpVoltage = inpVoltage * .8 + UART.data.inpVoltage * .2;  //Smoothing
+
+    if( inpVoltage > ( 3.9 * float( eesettings.cellCount ) ) )       gfx.TextColor(LIME, BLACK); 
+    else if( inpVoltage > ( 3.6 * float( eesettings.cellCount ) ) )  gfx.TextColor(YELLOW, BLACK); 
+    else                                  gfx.TextColor(RED, BLACK); 
+    
+    gfx.Font( 2 );  gfx.TextSize( 1 );
+    gfx.print( "V " );
+    gfx.print( String( inpVoltage, 1 ) );
 
     //    gfx.TextColor(CYAN, BLACK);
     //    gfx.print("M ");
@@ -173,46 +152,30 @@ void updateLCD()  {
     //
     //
     //
-    gfx.MoveTo(12, 90);
-    gfx.TextColor(ORANGE, BLACK);
-    gfx.print("W ");
+    gfx.MoveTo( 12, 90 );
+    gfx.TextColor( ORANGE, BLACK );
+    gfx.print( "W" );
 #ifdef ESC_UNITY
     int currentBatWatts = (UART.data.avgInputCurrent) * (UART.data.inpVoltage);
 #endif    
 #ifdef ESC_VESC
     int currentBatWatts = (UART.data.avgInputCurrent * 2) * (UART.data.inpVoltage);
 #endif    
-    if (currentBatWatts >= 1000) {
-      gfx.print(String(currentBatWatts));
-    }
-    else if (currentBatWatts < 0) {
-      gfx.print("-RGN");
-    }
-    else if (currentBatWatts >= 100) {
-      gfx.print("0");
-      gfx.print(String(currentBatWatts));
-    }
-    else if (currentBatWatts >= 10) {
-      gfx.print("00");
-      gfx.print(String(currentBatWatts));
-    }
-    else if (currentBatWatts <= 9) {
-      gfx.print("000");
-      gfx.print(String(currentBatWatts));
-    }
+   
+    sprintf(output,"% 05d",currentBatWatts);
+    gfx.print(output);
 
     gfx.MoveTo(12, 110);
     gfx.TextColor(CYAN, BLACK);
     gfx.print("O ");
+    
 #ifdef IMPERIAL
-    distanceValue = (ratioPulseDistance * UART.data.tachometerAbs) * 0.621371;
+    distanceValue = ( ratioPulseDistance * UART.data.tachometerAbs ) * 0.621371;
 #endif
 #ifdef METRIC
-    distanceValue = (ratioPulseDistance * UART.data.tachometerAbs);
+    distanceValue = ( ratioPulseDistance * UART.data.tachometerAbs );
 #endif
     gfx.print(String(distanceValue));
-
-
 
     //    successCount++;
     //    gfx.TextColor(CYAN, BLACK); gfx.Font(2);  gfx.TextSize(1);
@@ -223,9 +186,9 @@ void updateLCD()  {
     if (connBlink) {
       gfx.CircleFilled(65, 145, 8, LIMEGREEN);
     } else  {
-      gfx.Circle(65, 145, (8), BLACK);
-      gfx.Circle(65, 145, (7), BLACK);
-      gfx.Circle(65, 145, (6), BLACK);
+      gfx.Circle(65, 145, 8, BLACK);
+      gfx.Circle(65, 145, 7, BLACK);
+      gfx.Circle(65, 145, 6, BLACK);
     }
     connBlink = !connBlink;
   }
@@ -238,17 +201,17 @@ void updateLCD()  {
       gfx.CircleFilled(65, 145, 8, YELLOW);
       connBlinkCount = 0;
     }
-
   }
   updateRemoteBattery();
 }
 
-void updateRemoteBattery() {
+void updateRemoteBattery() 
+{
   int batteryLevel;
-  remoteBatRaw = ads.readADC_SingleEnded(3);
-  batteryLevel = map(remoteBatRaw, min_ads_bat, max_ads_bat, 0, 100);
-  batteryLevel = constrain(batteryLevel, 0, 100);
-  remoteBatteryDisplay(batteryLevel);
+  remoteBatRaw = ads.readADC_SingleEnded( 3 );
+  batteryLevel = map( remoteBatRaw, min_ads_bat, max_ads_bat, 0, 100 );
+  batteryLevel = constrain( batteryLevel, 0, 100 );
+  remoteBatteryDisplay( batteryLevel );
 
   //    gfx.MoveTo(12, 64);
   //    gfx.TextColor(RED, BLACK); gfx.Font(2);  gfx.TextSize(1);
@@ -257,9 +220,10 @@ void updateRemoteBattery() {
 
 }
 
-
-void remoteBatteryDisplay(int remoteBatVal) {
-  if (remoteBatVal > 95)  {
+void remoteBatteryDisplay(int remoteBatVal) 
+{  
+  if (remoteBatVal > 95)  
+  {
     gfx.RoundRectFilled(4, 137, 14, 153, 3, RED);
     gfx.RoundRectFilled(16, 137, 26, 153, 3, ORANGE);
     gfx.RoundRectFilled(28, 137, 38, 153, 3, YELLOW);
@@ -271,35 +235,42 @@ void remoteBatteryDisplay(int remoteBatVal) {
     }
     remoteBatFlash = !remoteBatFlash;
   }
-  else if (remoteBatVal > 70 && remoteBatVal <= 95) {
+  else if (remoteBatVal > 70 && remoteBatVal <= 95) 
+  {
     gfx.RoundRectFilled(4, 137, 14, 153, 3, RED);
     gfx.RoundRectFilled(16, 137, 26, 153, 3, ORANGE);
     gfx.RoundRectFilled(28, 137, 38, 153, 3, YELLOW);
     gfx.RoundRectFilled(40, 137, 50, 153, 3, LIME);
   }
-  else if (remoteBatVal > 50 && remoteBatVal <= 70) {
+  else if (remoteBatVal > 50 && remoteBatVal <= 70) 
+  {
     gfx.RoundRectFilled(4, 137, 14, 153, 3, RED);
     gfx.RoundRectFilled(16, 137, 26, 153, 3, ORANGE);
     gfx.RoundRectFilled(28, 137, 38, 153, 3, YELLOW);
     gfx.RoundRectFilled(40, 137, 50, 153, 3, BLACK);
   }
-  else if (remoteBatVal > 25 && remoteBatVal <= 50) {
+  else if (remoteBatVal > 25 && remoteBatVal <= 50) 
+  {
     gfx.RoundRectFilled(4, 137, 14, 153, 3, RED);
     gfx.RoundRectFilled(16, 137, 26, 153, 3, ORANGE);
     gfx.RoundRectFilled(28, 137, 38, 153, 3, BLACK);
     gfx.RoundRectFilled(40, 137, 50, 153, 3, BLACK);
   }
-  else if (remoteBatVal > 10 && remoteBatVal <= 25) {
+  else if (remoteBatVal > 10 && remoteBatVal <= 25) 
+  {
     gfx.RoundRectFilled(4, 137, 14, 153, 3, RED);
     gfx.RoundRectFilled(16, 137, 26, 153, 3, BLACK);
     gfx.RoundRectFilled(28, 137, 38, 153, 3, BLACK);
     gfx.RoundRectFilled(40, 137, 50, 153, 3, BLACK);
   }
-  else if (remoteBatVal <= 10) {
-    if (remoteBatFlash) {
+  else if (remoteBatVal <= 10) 
+  {
+    if (remoteBatFlash) 
+    {
       gfx.RoundRectFilled(4, 137, 14, 153, 3, RED);
     }
-    else {
+    else 
+    {
       gfx.RoundRectFilled(4, 137, 14, 153, 3, BLACK);
     }
     remoteBatFlash = !remoteBatFlash;
@@ -321,67 +292,4 @@ void readThrottle()
       throttle = map(thumbwheelVal0, min_ads, max_ads, 0, 255);
       throttle = constrain(throttle, 0, 255);
     }
-}
-
-
-void initWebConfig()
-{
-  WiFi.softAPdisconnect(true);
-  mac = WiFi.macAddress();
-  mac.replace(":","");
-
-  WiFi.mode(WIFI_AP_STA);
-  WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
-
-  mac.remove( 0, 6 );
-  mac = "OSRR-" + mac;
-  mac.toCharArray( apname, 32 );
-  WiFi.softAP( apname );
-
-  dnsServer.start(DNS_PORT, "*", apIP);
-  dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
-  dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
-
-  webServer.on("/config.php",handleConfig);
-  
-  webServer.onNotFound( handleNotFound ); //will use for default, just give option page
-  webServer.begin();
-}
-
-void webConfig()
-{
-  
-  gfx.TextColor(ORANGE, BLACK); gfx.Font(2);  gfx.TextSize(1);
-  gfx.println("      ");
-  gfx.println(" SETUP");
-  gfx.println("  MODE");
-  initWebConfig();
-  delay(250);
-  while(1)
-  {
-  dnsServer.processNextRequest();
-  webServer.handleClient();
-  delay(1);
-  }
-}
-
-
-
-bool readConfigEEPROM()
-{
-  motorPulley = EEPROM.read(addr_motorPulley); 
-  wheelPulley = EEPROM.read(addr_wheelPulley); 
-  wheelDiameter = EEPROM.read(addr_wheelDiameter);
-  calculateRatios();
-}
-
-void writeConfigEEPROM(int mp, int wp, int wd)
-{
-  EEPROM.write(addr_motorPulley, mp);
-  EEPROM.write(addr_wheelPulley, wp);
-  EEPROM.write(addr_wheelDiameter, wd);
-  //if success, need to add check
-  EEPROM.commit();
-  EEPROM.end();
-  delay(100);
 }

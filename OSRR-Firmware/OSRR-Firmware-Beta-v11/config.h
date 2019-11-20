@@ -2,8 +2,8 @@
 #define CONFIG_H
 
 // - Choose UART protocol:
-//define ESC_UNITY             // ESC_UNITY for UART communication with a UNITY
-#define ESC_VESC                // ESC_VESC for UART communication with a VESC 4.12-6.6
+#define ESC_UNITY             // ESC_UNITY for UART communication with a UNITY
+//#define ESC_VESC                // ESC_VESC for UART communication with a VESC 4.12-6.6
 
 // - Choose Metric or Imperial
 //#define METRIC
@@ -13,19 +13,23 @@
 // #define SIMPLE
 // #define FULL
 
+#include <EEPROM.h>
+#include "CRC32.h"
+#include <math.h>
+
 // Defining variables to hold values for speed and distance calculation
-int wheelDiameter = 145;  //Wheel diameter in MM. 
-int wheelPulley = 60;     //Wheel Pulley Tooth Count
-int motorPulley = 15;     //Motor Pulley Tooth Count
-float motorPoles = 14;      //Motor Poles - 14 default
+struct __attribute__((__packed__)) EEPROMSettings
+{
+  uint16_t wheelDiameter;
+  uint16_t wheelPulley;
+  uint16_t motorPulley;
+  float motorPoles;  //Motor Poles - 14 default
+  uint16_t cellCount;
 
-const int addr_wheelDiameter = 10;
-const int addr_wheelPulley = 20;
-const int addr_motorPulley = 30;
+  uint32_t CRC; //4
+};
 
-int e_wheelDiameter;  //Wheel diameter in MM. 
-int e_wheelPulley;     //Wheel Pulley Tooth Count
-int e_motorPulley;     //Motor Pulley Tooth Count
+EEPROMSettings eesettings;
 
 
 float gearRatio;
@@ -42,26 +46,25 @@ const long VescUpdateInterval = 20;
 int16_t thumbwheelVal0;
 int16_t thumbwheelVal1;
 String command;
-int throttle = 127;
-int throttleCenterMargin = 5;
+int16_t throttle = 127;
+int16_t throttleCenterMargin = 5;
 bool throttleActive = false;
-int min_ads = 0;
-int max_ads = 1700;
-int adc_max_limit = 2000;
+int16_t min_ads = 0;
+int16_t max_ads = 1700;
+int16_t adc_max_limit = 2000;
 
 
 int16_t remoteBatRaw;
-int min_ads_bat = 1000;
-int max_ads_bat = 1400;
-int adc_max_bat_limit = 2000;
+int16_t min_ads_bat = 1000;
+int16_t max_ads_bat = 1400;
+int16_t adc_max_bat_limit = 2000;
 
 int16_t remoteRSSIRaw;
 
 void calculateRatios()  {
-  gearRatio = ( (float)motorPulley / (float)wheelPulley );
-  ratioRpmSpeed = (gearRatio * 60 * (float)wheelDiameter * 3.14156) / ((motorPoles / 2) * 1000000);
-  ratioPulseDistance = (gearRatio * (float)wheelDiameter * 3.14156) / ((motorPoles * 3) * 1000000);
-
+  gearRatio = ( float( eesettings.motorPulley ) / float( eesettings.wheelPulley ) );
+  ratioRpmSpeed = gearRatio * 60 * ( float( eesettings.wheelDiameter ) * M_PI ) / ((eesettings.motorPoles / 2) * 1000000);
+  ratioPulseDistance = gearRatio * ( float( eesettings.wheelDiameter ) * M_PI ) / ((eesettings.motorPoles * 3) * 1000000);
 }
 
 //UNUSED (Future ToDo)
@@ -128,6 +131,72 @@ bool connBlink = true;
 int connBlinkCount = 0;
 unsigned long failCount = 0;
 unsigned long successCount = 0;
+
+
+uint32_t CalculateEEPROM_CRC()
+{
+  uint8_t* settings_ptr = (uint8_t*)&eesettings;
+  int length = sizeof(eesettings) - sizeof(uint32_t);
+  
+  return CRC32::calculate(settings_ptr, length);
+}
+
+bool LoadSavedSettings()
+{
+  uint32_t calculated = CalculateEEPROM_CRC();
+  uint32_t saved = eesettings.CRC;
+
+  if( calculated == saved )
+  {
+    /*
+    Serial.println(eesettings.wheelDiameter);
+    Serial.println(eesettings.wheelPulley);
+    Serial.println(eesettings.motorPulley);
+    Serial.println(eesettings.cellCount);
+    */
+    return true;
+  }
+
+  gfx.TextColor( RED, BLACK ); gfx.Font( 2 );  gfx.TextSize( 1 );
+  gfx.println( "  Uh " );
+  gfx.println( "  Oh " );
+  gfx.println();
+
+  long long mill = millis() + 2000;
+  while( millis() < mill )
+  {
+    yield();
+  }
+
+  return false;
+}
+
+
+bool readConfigEEPROM()
+{
+  EEPROM.get( 0, eesettings );
+  if( !LoadSavedSettings() ) return false;
+  
+  calculateRatios();
+}
+
+void writeConfigEEPROM(int mp, int wp, int wd, int cellcount)
+{
+  eesettings.wheelDiameter = wd;
+  eesettings.wheelPulley = wp;
+  eesettings.motorPulley = mp;
+  eesettings.cellCount = cellcount;
+  eesettings.motorPoles = 14;  //default
+
+  uint32_t calcCRC = CalculateEEPROM_CRC();
+  eesettings.CRC = calcCRC;
+  EEPROM.put( 0, eesettings );
+  
+  EEPROM.commit();
+  EEPROM.end();
+
+  calculateRatios();
+}
 
 
 #endif
