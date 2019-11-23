@@ -31,17 +31,27 @@ struct __attribute__((__packed__)) EEPROMSettings
 
 EEPROMSettings eesettings;
 
-
 float gearRatio;
 float ratioRpmSpeed;
 float ratioPulseDistance;
 float distanceValue;
 
-
-unsigned long previousLCDUpdate = 0;
-unsigned long previousVescUpdate = 0;
+//varables for timers
 const long LCDUpdateInterval = 250;
 const long VescUpdateInterval = 20;
+unsigned long previousLCDUpdate = 0;
+unsigned long previousThrottleUpdate = 0;
+unsigned long previousTelemetryUpdate = 0;
+int remoteConnectionTimeout = 500;
+
+//curent state
+boolean remoteConnected = false;
+float speedValue = 0;
+float boardVoltage = 0;
+float avgMotorCurrent = 0;
+float avgInputCurrent = 0;
+int avgInputWatts = 0;
+float tachometer = 0;
 
 int16_t thumbwheelVal0;
 int16_t thumbwheelVal1;
