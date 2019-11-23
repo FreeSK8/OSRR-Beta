@@ -157,6 +157,42 @@ void pictureGRAM(uint8_t data[], uint8_t xPos, uint8_t yPos, uint16_t color, uin
   }
 }
 
+void displayPutChar(const uint8_t *font, uint8_t x, uint8_t y, char c, uint16_t color, uint16_t bgcolor) {
+  if (c == '\0') {
+    return;
+  }
+
+  c -= ' ';                         //remove first 32 no text ASCII characters
+
+  uint8_t w = font[0];              //width of charater is first value in array
+  uint8_t h = font[1];              //height of charater is second value in array
+  
+  int bytes_per_char = (w * h) / 2; // 2 x 4 bit pixels per byte
+  if ((w * h) % 2 != 0) {           //if font size has odd number of pixels per charater, make sure we round up to nearest full byte
+    bytes_per_char++;
+  }
+  
+  int charIndex = 2;                        //skip width and height bytes
+  charIndex += c*bytes_per_char;         //skip to location in array for required character
+
+  gfx.setGRAM(x,y, x+w-1, y+h-1);   //set display are to write to
+
+  for (int i = 0; i < bytes_per_char ; i++) { //for each byte in character
+//    uint8_t nibble0 = font[charIndex+i] & 0xF0;       // color for first pixel
+//    uint8_t nibble1 = font[charIndex+i]<<4 & 0xF0;    // Color for second pixel
+    
+    //uint16_t pixel0 = RGBtoColor( nibble0, nibble0, nibble0);
+    //uint16_t pixel1 = RGBtoColor( nibble1, nibble1, nibble1);
+    
+    uint8_t nibble0 = font[charIndex+i]>>4 & 0x0F;       // color for first pixel
+    uint8_t nibble1 = font[charIndex+i] & 0x0F;    // Color for second pixel
+    uint16_t pixel0 = mapColor(nibble0, 0, 15, bgcolor, color);
+    uint16_t pixel1 = mapColor(nibble1, 0, 15, bgcolor, color);
+    gfx.WrGRAM(pixel1<< 16 |pixel0);
+  }
+}
+
+
 void bootlogo() {
   pictureGRAM(OSRRlogo, 0,0, RGBtoColor(255,255,255), BLACK);
   delay(1000);
