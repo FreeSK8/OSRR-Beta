@@ -193,6 +193,15 @@ void displayPutChar(const uint8_t *font, uint8_t x, uint8_t y, char c, uint16_t 
   }
 }
 
+void displayPrintf(const uint8_t *font, uint8_t x, uint8_t y, String text, uint16_t color, uint16_t bgcolor) {
+
+  uint8_t w = font[0];              //width of each character
+  //uint8_t h = font[1];            //height of each character (not currentley needed)
+
+  for (int i = 0; i < text.length() ; i++) { //write out each character in the string
+    displayPutChar(font,x+(w*i),y,text.charAt(i),color,bgcolor);
+  }
+}
 
 void bootlogo() {
   pictureGRAM(OSRRlogo, 0,0, RGBtoColor(255,255,255), BLACK);

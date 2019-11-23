@@ -20,11 +20,11 @@
 
 #include <stdint.h>
 
-extern const uint8_t font_aa_8x16[];
-extern const uint8_t font_aa_9x13[];
-extern const uint8_t font_aa_10x15[];
-extern const uint8_t font_aa_11x21[];
-extern const uint8_t font_aa_16x24[];
+extern const uint8_t font_aa_8x16[];    //looks ok
+extern const uint8_t font_aa_9x13[];    //looks bad
+extern const uint8_t font_aa_10x15[];   //looks bad
+extern const uint8_t font_aa_11x21[];   //looks good
+extern const uint8_t font_aa_16x24[];   //looks good
 extern const uint8_t image_boot[];
 
 extern const uint8_t font_aa_25x45[];
