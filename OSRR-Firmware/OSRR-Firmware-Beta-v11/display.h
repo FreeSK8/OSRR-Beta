@@ -205,6 +205,7 @@ void displayPrintf(const uint8_t *font, uint8_t x, uint8_t y, String text, uint1
 
 void bootlogo() {
   pictureGRAM(OSRRlogo, 0,0, RGBtoColor(255,255,255), BLACK);
+//  displayPrintf(font_aa_16x24,0,80,"Hello",WHITE,BLACK); //example print using new fonts
   delay(1000);
 }
 
