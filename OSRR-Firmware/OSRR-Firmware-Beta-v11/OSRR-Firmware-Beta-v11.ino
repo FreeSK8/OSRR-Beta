@@ -128,32 +128,25 @@ void checkTelemetry()
     
     #ifdef IMPERIAL
       speedValue = ((ratioRpmSpeed * UART.data.rpm) * 0.621371);
+      tachometer = ( ratioPulseDistance * UART.data.tachometerAbs ) * 0.621371;
     #endif
     #ifdef METRIC
       speedValue = (ratioRpmSpeed * UART.data.rpm);
+      tachometer = ( ratioPulseDistance * UART.data.tachometerAbs );
     #endif
-
-    boardVoltage = boardVoltage * .8 + UART.data.inpVoltage * .2;  //Smoothing
-
-    avgMotorCurrent = UART.data.avgMotorCurrent * 2;
 
     #ifdef ESC_UNITY
-      avgInputCurrent = UART.data.avgInputCurrent;
+      avgMotorCurrent = (UART.data.avgMotorCurrent0 + UART.data.avgMotorCurrent1) * ESC_MULTIPLIER;
     #endif    
     #ifdef ESC_VESC
-      avgInputCurrent = UART.data.avgInputCurrent*2;
-    #endif   
+      avgMotorCurrent = UART.data.avgMotorCurrent * ESC_MULTIPLIER;
+    #endif  
+
+    avgInputCurrent = UART.data.avgInputCurrent * ESC_MULTIPLIER;
+    
+    boardVoltage = boardVoltage * .8 + UART.data.inpVoltage * .2;  //Smoothing
 
     avgInputWatts = avgInputCurrent * boardVoltage;
-    
-    avgInputCurrent = UART.data.avgInputCurrent;
-
-    #ifdef IMPERIAL
-        tachometer = ( ratioPulseDistance * UART.data.tachometerAbs ) * 0.621371;
-    #endif
-    #ifdef METRIC
-        tachometer = ( ratioPulseDistance * UART.data.tachometerAbs );
-    #endif
     
   } else {
     if (remoteConnected && millis() >= previousTelemetryUpdate + remoteConnectionTimeout ) { //if status is connected but no telemetry was recieved for a while

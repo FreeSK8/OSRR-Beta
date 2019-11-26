@@ -5,6 +5,11 @@
 #define ESC_UNITY             // ESC_UNITY for UART communication with a UNITY
 //#define ESC_VESC                // ESC_VESC for UART communication with a VESC 4.12-6.6
 
+// - Choose Number ESC's:
+#define ESC_MULTIPLIER 1      // if you have a 1WD using single VESC or 2WD using single UNITY
+//#define ESC_MULTIPLIER 2      // if you have dual VESC or 4WD using dual UNITY
+//#define ESC_MULTIPLIER 4      // if you have quad VESC
+
 // - Choose Metric or Imperial
 //#define METRIC
 #define IMPERIAL
