@@ -3,9 +3,10 @@
 
 #include "GFX4dIoD9.h"
 
+#include "fonts.h"
 extern GFX4dIoD9 gfx;
 
-uint8_t OSRRlogo [] = {
+uint8_t OSRRlogo [] = { // 1 bit per pixel image for boot logo
   80,160,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
@@ -110,9 +111,29 @@ uint8_t OSRRlogo [] = {
 };
 
 int16_t RGBtoColor(uint8_t R, uint8_t G, uint8_t B){ //turn 3 8bit RGB values into a 16 bit "565" colour
-  R = (R >> 3) & 0x001f;      //convert red value to 5 bits
-  G = (G >> 2) & 0x003f;      //convert green value to 6 bits
-  B = (B >> 3) & 0x001f;      //convert blue value to 5 bits
+//  R = (R >> 3) & 0x001f;      //convert red value to 5 bits
+//  G = (G >> 2) & 0x003f;      //convert green value to 6 bits
+//  B = (B >> 3) & 0x001f;      //convert blue value to 5 bits
+//  return( R<<11 | G<<5 | B ); //combine in corect order for display
+  return ( ((R & 0xF8) << 8) | ((G & 0xFC) << 3) | (B >> 3) );
+}
+
+uint8_t getRedFromColor(uint16_t color){
+  return ((color >> 11) & 0x1F);
+}
+
+uint8_t getGreenFromColor(uint16_t color){
+  return ((color >> 5) & 0x3F);
+}
+
+uint8_t getBlueFromColor(uint16_t color){
+  return (color & 0x1F);
+}
+
+int16_t mapColor(uint8_t x, uint8_t in_min, uint8_t in_max , uint16_t color0, uint16_t color1){ //turn 3 8bit RGB values into a 16 bit "565" colour
+  uint8_t R = map( x, in_min, in_max, getRedFromColor(color0), getRedFromColor(color1));
+  uint8_t G = map( x, in_min, in_max, getGreenFromColor(color0), getGreenFromColor(color1));
+  uint8_t B = map( x, in_min, in_max, getBlueFromColor(color0), getBlueFromColor(color1));
   return( R<<11 | G<<5 | B ); //combine in corect order for display
 }
 
@@ -136,8 +157,54 @@ void pictureGRAM(uint8_t data[], uint8_t xPos, uint8_t yPos, uint16_t color, uin
   }
 }
 
+void displayPutChar(const uint8_t *font, uint8_t x, uint8_t y, char c, uint16_t color, uint16_t bgcolor) {
+  if (c == '\0') {
+    return;
+  }
+
+  c -= ' ';                         //remove first 32 no text ASCII characters
+
+  uint8_t w = font[0];              //width of charater is first value in array
+  uint8_t h = font[1];              //height of charater is second value in array
+  
+  int bytes_per_char = (w * h) / 2; // 2 x 4 bit pixels per byte
+  if ((w * h) % 2 != 0) {           //if font size has odd number of pixels per charater, make sure we round up to nearest full byte
+    bytes_per_char++;
+  }
+  
+  int charIndex = 2;                        //skip width and height bytes
+  charIndex += c*bytes_per_char;         //skip to location in array for required character
+
+  gfx.setGRAM(x,y, x+w-1, y+h-1);   //set display are to write to
+
+  for (int i = 0; i < bytes_per_char ; i++) { //for each byte in character
+//    uint8_t nibble0 = font[charIndex+i] & 0xF0;       // color for first pixel
+//    uint8_t nibble1 = font[charIndex+i]<<4 & 0xF0;    // Color for second pixel
+    
+    //uint16_t pixel0 = RGBtoColor( nibble0, nibble0, nibble0);
+    //uint16_t pixel1 = RGBtoColor( nibble1, nibble1, nibble1);
+    
+    uint8_t nibble0 = font[charIndex+i]>>4 & 0x0F;       // color for first pixel
+    uint8_t nibble1 = font[charIndex+i] & 0x0F;    // Color for second pixel
+    uint16_t pixel0 = mapColor(nibble0, 0, 15, bgcolor, color);
+    uint16_t pixel1 = mapColor(nibble1, 0, 15, bgcolor, color);
+    gfx.WrGRAM(pixel1<< 16 |pixel0);
+  }
+}
+
+void displayPrintf(const uint8_t *font, uint8_t x, uint8_t y, String text, uint16_t color, uint16_t bgcolor) {
+
+  uint8_t w = font[0];              //width of each character
+  //uint8_t h = font[1];            //height of each character (not currentley needed)
+
+  for (int i = 0; i < text.length() ; i++) { //write out each character in the string
+    displayPutChar(font,x+(w*i),y,text.charAt(i),color,bgcolor);
+  }
+}
+
 void bootlogo() {
   pictureGRAM(OSRRlogo, 0,0, RGBtoColor(255,255,255), BLACK);
+//  displayPrintf(font_aa_16x24,0,80,"Hello",WHITE,BLACK); //example print using new fonts
   delay(1000);
 }
 
