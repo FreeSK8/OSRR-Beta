@@ -5,6 +5,11 @@
 #define ESC_UNITY             // ESC_UNITY for UART communication with a UNITY
 //#define ESC_VESC                // ESC_VESC for UART communication with a VESC 4.12-6.6
 
+// - Choose Number ESC's:
+#define ESC_MULTIPLIER 1      // if you have a 1WD using single VESC or 2WD using single UNITY
+//#define ESC_MULTIPLIER 2      // if you have dual VESC or 4WD using dual UNITY
+//#define ESC_MULTIPLIER 4      // if you have quad VESC
+
 // - Choose Metric or Imperial
 //#define METRIC
 #define IMPERIAL
@@ -31,17 +36,27 @@ struct __attribute__((__packed__)) EEPROMSettings
 
 EEPROMSettings eesettings;
 
-
 float gearRatio;
 float ratioRpmSpeed;
 float ratioPulseDistance;
 float distanceValue;
 
-
-unsigned long previousLCDUpdate = 0;
-unsigned long previousVescUpdate = 0;
+//varables for timers
 const long LCDUpdateInterval = 250;
 const long VescUpdateInterval = 20;
+unsigned long previousLCDUpdate = 0;
+unsigned long previousThrottleUpdate = 0;
+unsigned long previousTelemetryUpdate = 0;
+int remoteConnectionTimeout = 500;
+
+//curent state
+boolean remoteConnected = false;
+float speedValue = 0;
+float boardVoltage = 0;
+float avgMotorCurrent = 0;
+float avgInputCurrent = 0;
+int avgInputWatts = 0;
+float tachometer = 0;
 
 int16_t thumbwheelVal0;
 int16_t thumbwheelVal1;

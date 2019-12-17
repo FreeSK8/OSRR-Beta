@@ -2,7 +2,6 @@
 #define DISPLAY_H
 
 #include "GFX4dIoD9.h"
-
 #include "fonts.h"
 extern GFX4dIoD9 gfx;
 

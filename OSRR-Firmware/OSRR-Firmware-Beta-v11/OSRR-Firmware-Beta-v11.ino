@@ -68,8 +68,7 @@ void setup()
     webConfig();
   }
     
-  updateLCD();                                //Update values on LCD
-  gfx.RoundRect(2, 135, 52, 155, 3, LIME);    //Draw Remote Battery Meter Border
+  screenHomeClassic();                                //Update values on LCD
       
 }
 
@@ -78,7 +77,7 @@ void loop()
 
   unsigned long currentMillis = millis();
 
-  if( currentMillis - previousVescUpdate >= VescUpdateInterval ) 
+  if( currentMillis - previousThrottleUpdate >= VescUpdateInterval ) 
   {
     readThrottle();
   
@@ -94,192 +93,19 @@ void loop()
   
     //remoteRSSIRaw = ads.readADC_SingleEnded(2);
   
-    previousVescUpdate = currentMillis;
+    previousThrottleUpdate = currentMillis;
   }
+
+  checkTelemetry();
   
   if( currentMillis - previousLCDUpdate >= LCDUpdateInterval ) 
   {
-    updateLCD();
+    screenHomeClassic();
     previousLCDUpdate = currentMillis;
   }
-
+  
   yield(); // Required for ESP
 }
-
-char output[20];
-double inpVoltage = 0;
-
-void updateLCD()  {
-  if ( UART.getVescValues() ) {
-    
-#ifdef IMPERIAL
-    int speedValue = ((ratioRpmSpeed * UART.data.rpm) * 0.621371);
-#endif
-#ifdef METRIC
-    int speedValue = (ratioRpmSpeed * UART.data.rpm);
-#endif
-
-    gfx.MoveTo(15, 10);
-    gfx.TextColor(YELLOW, BLACK); gfx.Font(2);  gfx.TextSize(3);
-    
-    sprintf(output,"%02d",speedValue);
-    gfx.print(String(output));
-
-    gfx.MoveTo(12, 70);
-
-    inpVoltage = inpVoltage * .8 + UART.data.inpVoltage * .2;  //Smoothing
-
-    if( inpVoltage > ( 3.9 * float( eesettings.cellCount ) ) )       gfx.TextColor(LIME, BLACK); 
-    else if( inpVoltage > ( 3.6 * float( eesettings.cellCount ) ) )  gfx.TextColor(YELLOW, BLACK); 
-    else                                  gfx.TextColor(RED, BLACK); 
-    
-    gfx.Font( 2 );  gfx.TextSize( 1 );
-    gfx.print( "V " );
-    gfx.print( String( inpVoltage, 1 ) );
-
-    //    gfx.TextColor(CYAN, BLACK);
-    //    gfx.print("M ");
-    //    int currentMotorWatts = (UART.data.avgMotorCurrent * 2) * (UART.data.dutyCycleNow * UART.data.inpVoltage);
-    //    if (currentMotorWatts >= 100) {
-    //      gfx.println(String(currentMotorWatts));
-    //    } else if (currentMotorWatts >= 10) {
-    //      gfx.print("0");
-    //      gfx.println(String(currentMotorWatts));
-    //    } else if (currentMotorWatts <= 9) {
-    //      gfx.print("00");
-    //      gfx.println(String(currentMotorWatts));
-    //    }
-    //
-    //
-    //
-    gfx.MoveTo( 12, 90 );
-    gfx.TextColor( ORANGE, BLACK );
-    gfx.print( "W" );
-#ifdef ESC_UNITY
-    int currentBatWatts = (UART.data.avgInputCurrent) * (UART.data.inpVoltage);
-#endif    
-#ifdef ESC_VESC
-    int currentBatWatts = (UART.data.avgInputCurrent * 2) * (UART.data.inpVoltage);
-#endif    
-   
-    sprintf(output,"% 05d",currentBatWatts);
-    gfx.print(output);
-
-    gfx.MoveTo(12, 110);
-    gfx.TextColor(CYAN, BLACK);
-    gfx.print("O ");
-    
-#ifdef IMPERIAL
-    distanceValue = ( ratioPulseDistance * UART.data.tachometerAbs ) * 0.621371;
-#endif
-#ifdef METRIC
-    distanceValue = ( ratioPulseDistance * UART.data.tachometerAbs );
-#endif
-    gfx.print(String(distanceValue));
-
-    //    successCount++;
-    //    gfx.TextColor(CYAN, BLACK); gfx.Font(2);  gfx.TextSize(1);
-    //    gfx.println(String(successCount));
-    //    gfx.TextColor(RED, BLACK); gfx.Font(2);  gfx.TextSize(1);
-    //    gfx.println(String(failCount));
-
-    if (connBlink) {
-      gfx.CircleFilled(65, 145, 8, LIMEGREEN);
-    } else  {
-      gfx.Circle(65, 145, 8, BLACK);
-      gfx.Circle(65, 145, 7, BLACK);
-      gfx.Circle(65, 145, 6, BLACK);
-    }
-    connBlink = !connBlink;
-  }
-  else
-  {
-    //    failCount++;
-    connBlinkCount++;
-
-    if (connBlinkCount >= 5) {
-      gfx.CircleFilled(65, 145, 8, YELLOW);
-      connBlinkCount = 0;
-    }
-  }
-  updateRemoteBattery();
-}
-
-void updateRemoteBattery() 
-{
-  int batteryLevel;
-  remoteBatRaw = ads.readADC_SingleEnded( 3 );
-  batteryLevel = map( remoteBatRaw, min_ads_bat, max_ads_bat, 0, 100 );
-  batteryLevel = constrain( batteryLevel, 0, 100 );
-  remoteBatteryDisplay( batteryLevel );
-
-  //    gfx.MoveTo(12, 64);
-  //    gfx.TextColor(RED, BLACK); gfx.Font(2);  gfx.TextSize(1);
-  //    gfx.print("R ");
-  //    gfx.print(String(remoteBatRaw));
-
-}
-
-void remoteBatteryDisplay(int remoteBatVal) 
-{  
-  if (remoteBatVal > 95)  
-  {
-    gfx.RoundRectFilled(4, 137, 14, 153, 3, RED);
-    gfx.RoundRectFilled(16, 137, 26, 153, 3, ORANGE);
-    gfx.RoundRectFilled(28, 137, 38, 153, 3, YELLOW);
-    if (remoteBatFlash) {
-      gfx.RoundRectFilled(40, 137, 50, 153, 3, LIME);
-    }
-    else  {
-      gfx.RoundRectFilled(40, 137, 50, 153, 3, LIMEGREEN);
-    }
-    remoteBatFlash = !remoteBatFlash;
-  }
-  else if (remoteBatVal > 70 && remoteBatVal <= 95) 
-  {
-    gfx.RoundRectFilled(4, 137, 14, 153, 3, RED);
-    gfx.RoundRectFilled(16, 137, 26, 153, 3, ORANGE);
-    gfx.RoundRectFilled(28, 137, 38, 153, 3, YELLOW);
-    gfx.RoundRectFilled(40, 137, 50, 153, 3, LIME);
-  }
-  else if (remoteBatVal > 50 && remoteBatVal <= 70) 
-  {
-    gfx.RoundRectFilled(4, 137, 14, 153, 3, RED);
-    gfx.RoundRectFilled(16, 137, 26, 153, 3, ORANGE);
-    gfx.RoundRectFilled(28, 137, 38, 153, 3, YELLOW);
-    gfx.RoundRectFilled(40, 137, 50, 153, 3, BLACK);
-  }
-  else if (remoteBatVal > 25 && remoteBatVal <= 50) 
-  {
-    gfx.RoundRectFilled(4, 137, 14, 153, 3, RED);
-    gfx.RoundRectFilled(16, 137, 26, 153, 3, ORANGE);
-    gfx.RoundRectFilled(28, 137, 38, 153, 3, BLACK);
-    gfx.RoundRectFilled(40, 137, 50, 153, 3, BLACK);
-  }
-  else if (remoteBatVal > 10 && remoteBatVal <= 25) 
-  {
-    gfx.RoundRectFilled(4, 137, 14, 153, 3, RED);
-    gfx.RoundRectFilled(16, 137, 26, 153, 3, BLACK);
-    gfx.RoundRectFilled(28, 137, 38, 153, 3, BLACK);
-    gfx.RoundRectFilled(40, 137, 50, 153, 3, BLACK);
-  }
-  else if (remoteBatVal <= 10) 
-  {
-    if (remoteBatFlash) 
-    {
-      gfx.RoundRectFilled(4, 137, 14, 153, 3, RED);
-    }
-    else 
-    {
-      gfx.RoundRectFilled(4, 137, 14, 153, 3, BLACK);
-    }
-    remoteBatFlash = !remoteBatFlash;
-    gfx.RoundRectFilled(16, 137, 26, 153, 3, BLACK);
-    gfx.RoundRectFilled(28, 137, 38, 153, 3, BLACK);
-    gfx.RoundRectFilled(40, 137, 50, 153, 3, BLACK);
-  }
-}
-
 
 void readThrottle()
 {
@@ -292,4 +118,39 @@ void readThrottle()
       throttle = map(thumbwheelVal0, min_ads, max_ads, 0, 255);
       throttle = constrain(throttle, 0, 255);
     }
+}
+
+void checkTelemetry()
+{
+  if ( UART.getVescValues()) {
+    previousTelemetryUpdate = millis();
+    remoteConnected = true;
+    
+    #ifdef IMPERIAL
+      speedValue = ((ratioRpmSpeed * UART.data.rpm) * 0.621371);
+      tachometer = ( ratioPulseDistance * UART.data.tachometerAbs ) * 0.621371;
+    #endif
+    #ifdef METRIC
+      speedValue = (ratioRpmSpeed * UART.data.rpm);
+      tachometer = ( ratioPulseDistance * UART.data.tachometerAbs );
+    #endif
+
+    #ifdef ESC_UNITY
+      avgMotorCurrent = (UART.data.avgMotorCurrent0 + UART.data.avgMotorCurrent1) * ESC_MULTIPLIER;
+    #endif    
+    #ifdef ESC_VESC
+      avgMotorCurrent = UART.data.avgMotorCurrent * ESC_MULTIPLIER;
+    #endif  
+
+    avgInputCurrent = UART.data.avgInputCurrent * ESC_MULTIPLIER;
+    
+    boardVoltage = boardVoltage * .8 + UART.data.inpVoltage * .2;  //Smoothing
+
+    avgInputWatts = avgInputCurrent * boardVoltage;
+    
+  } else {
+    if (remoteConnected && millis() >= previousTelemetryUpdate + remoteConnectionTimeout ) { //if status is connected but no telemetry was recieved for a while
+      remoteConnected = false;
+    }
+  }
 }
