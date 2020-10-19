@@ -6,6 +6,7 @@ OSRR- Open Source Racing Remote, which serves as an open spec reference design f
 
 ### Authors & Contributors:
 Andrew Dresner
+
 Renee Love
 
 For information on setup & usage, please see the Wiki: 
